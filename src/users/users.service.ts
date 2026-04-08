@@ -1,4 +1,8 @@
-import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { User, UserDocument, UserRole } from './schemas/user.schema';
@@ -27,12 +31,10 @@ export class UsersService {
       throw new ConflictException('User with this email already exists');
     }
 
-    const user = await this.userModel.create({
+    return this.userModel.create({
       ...payload,
       email: payload.email.toLowerCase(),
     });
-
-    return user;
   }
 
   async findByEmail(email: string) {
@@ -47,5 +49,21 @@ export class UsersService {
     }
 
     return user;
+  }
+
+  async markEmailAsVerified(userId: string) {
+    return this.userModel.findByIdAndUpdate(
+      userId,
+      { isEmailVerified: true },
+      { new: true },
+    );
+  }
+
+  async updatePassword(userId: string, hashedPassword: string) {
+    return this.userModel.findByIdAndUpdate(
+      userId,
+      { password: hashedPassword },
+      { new: true },
+    );
   }
 }
