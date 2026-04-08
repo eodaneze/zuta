@@ -10,7 +10,6 @@ import {
 import {
   ApiBearerAuth,
   ApiOperation,
-  ApiQuery,
   ApiTags,
 } from '@nestjs/swagger';
 import { AdminService } from './admin.service';
@@ -19,7 +18,9 @@ import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
 import { UserRole } from '../users/schemas/user.schema';
 import { AdminReviewDto } from './dto/admin-review.dto';
-import { VendorStatus } from '../vendor/enums/vendor-status.enum';
+import { AdminQueryUsersDto } from './dto/admin-query-users.dto';
+import { AdminQueryVendorStoreDto } from './dto/admin-query-vendor-store.dto';
+import { AdminQueryVendorKycDto } from './dto/admin-query-vendor-kyc.dto';
 
 @ApiTags('Admin')
 @ApiBearerAuth()
@@ -30,36 +31,21 @@ export class AdminController {
   constructor(private readonly adminService: AdminService) {}
 
   @Get('users')
-  @ApiOperation({ summary: 'Get all users with search and role filter' })
-  @ApiQuery({ name: 'search', required: false, type: String })
-  @ApiQuery({ name: 'role', required: false, enum: UserRole })
-  getUsers(
-    @Query('search') search?: string,
-    @Query('role') role?: UserRole,
-  ) {
-    return this.adminService.getUsers(search, role);
+  @ApiOperation({ summary: 'Get all users with search, role filter and pagination' })
+  getUsers(@Query() query: AdminQueryUsersDto) {
+    return this.adminService.getUsers(query);
   }
 
   @Get('stores')
-  @ApiOperation({ summary: 'Get all vendor stores with status filter' })
-  @ApiQuery({ name: 'status', required: false, enum: VendorStatus })
-  @ApiQuery({ name: 'search', required: false, type: String })
-  getStores(
-    @Query('status') status?: VendorStatus,
-    @Query('search') search?: string,
-  ) {
-    return this.adminService.getStores(status, search);
+  @ApiOperation({ summary: 'Get all vendor stores with status filter and pagination' })
+  getStores(@Query() query: AdminQueryVendorStoreDto) {
+    return this.adminService.getStores(query);
   }
 
   @Get('kycs')
-  @ApiOperation({ summary: 'Get all vendor KYC submissions with status filter' })
-  @ApiQuery({ name: 'status', required: false, enum: VendorStatus })
-  @ApiQuery({ name: 'search', required: false, type: String })
-  getKycs(
-    @Query('status') status?: VendorStatus,
-    @Query('search') search?: string,
-  ) {
-    return this.adminService.getKycs(status, search);
+  @ApiOperation({ summary: 'Get all vendor KYC submissions with status filter and pagination' })
+  getKycs(@Query() query: AdminQueryVendorKycDto) {
+    return this.adminService.getKycs(query);
   }
 
   @Patch('stores/:vendorProfileId/approve')

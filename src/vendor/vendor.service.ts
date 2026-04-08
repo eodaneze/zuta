@@ -269,7 +269,18 @@ export class VendorService {
     };
   }
 
-  async adminGetStores(status?: VendorStatus, search?: string) {
+  
+    async adminGetStores(params: {
+    status?: VendorStatus;
+    search?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    const { status, search } = params;
+    const page = params.page ?? 1;
+    const limit = params.limit ?? 10;
+    const skip = (page - 1) * limit;
+
     const query: Record<string, any> = {};
 
     if (status) {
@@ -284,18 +295,39 @@ export class VendorService {
       ];
     }
 
-    const stores = await this.vendorProfileModel
-      .find(query)
-      .populate('userId', 'fullName email phone country roles isVendor')
-      .sort({ createdAt: -1 });
+    const [stores, total] = await Promise.all([
+      this.vendorProfileModel
+        .find(query)
+        .populate('userId', 'fullName email phone country roles isVendor')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit),
+      this.vendorProfileModel.countDocuments(query),
+    ]);
 
     return {
       message: 'Vendor stores fetched successfully',
       data: stores,
+      meta: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
     };
   }
 
-  async adminGetKycs(status?: VendorStatus, search?: string) {
+  async adminGetKycs(params: {
+    status?: VendorStatus;
+    search?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    const { status, search } = params;
+    const page = params.page ?? 1;
+    const limit = params.limit ?? 10;
+    const skip = (page - 1) * limit;
+
     const baseQuery: Record<string, any> = {};
 
     if (status) {
@@ -321,9 +353,18 @@ export class VendorService {
       });
     }
 
+    const total = kycs.length;
+    const paginatedKycs = kycs.slice(skip, skip + limit);
+
     return {
       message: 'Vendor KYC submissions fetched successfully',
-      data: kycs,
+      data: paginatedKycs,
+      meta: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
     };
   }
 

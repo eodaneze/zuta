@@ -13,7 +13,17 @@ export class AdminService {
     private readonly vendorService: VendorService,
   ) {}
 
-  async getUsers(search?: string, role?: UserRole) {
+  async getUsers(params: {
+    search?: string;
+    role?: UserRole;
+    page?: number;
+    limit?: number;
+  }) {
+    const { search, role } = params;
+    const page = params.page ?? 1;
+    const limit = params.limit ?? 10;
+    const skip = (page - 1) * limit;
+
     const query: Record<string, any> = {};
 
     if (role) {
@@ -28,23 +38,44 @@ export class AdminService {
       ];
     }
 
-    const users = await this.userModel
-      .find(query)
-      .select('-password')
-      .sort({ createdAt: -1 });
+    const [users, total] = await Promise.all([
+      this.userModel
+        .find(query)
+        .select('-password')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit),
+      this.userModel.countDocuments(query),
+    ]);
 
     return {
       message: 'Users fetched successfully',
       data: users,
+      meta: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
     };
   }
 
-  async getStores(status?: VendorStatus, search?: string) {
-    return this.vendorService.adminGetStores(status, search);
+  async getStores(params: {
+    status?: VendorStatus;
+    search?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    return this.vendorService.adminGetStores(params);
   }
 
-  async getKycs(status?: VendorStatus, search?: string) {
-    return this.vendorService.adminGetKycs(status, search);
+  async getKycs(params: {
+    status?: VendorStatus;
+    search?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    return this.vendorService.adminGetKycs(params);
   }
 
   async approveStore(vendorProfileId: string) {
