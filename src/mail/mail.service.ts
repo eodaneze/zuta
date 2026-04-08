@@ -85,4 +85,35 @@ export class MailService {
       context: payload,
     });
   }
+
+  async sendVendorApprovedEmail(
+  to: string,
+  payload: {
+    name: string;
+    subject: string;
+  },
+) {
+  return this.sendMail({
+    to,
+    subject: `${payload.subject} approved`,
+    templateName: 'vendor-approved',
+    context: payload,
+  });
+}
+
+  async sendVendorRejectedEmail(
+    to: string,
+    payload: {
+      name: string;
+      subject: string;
+      reason: string;
+    },
+  ) {
+    return this.sendMail({
+      to,
+      subject: `${payload.subject} rejected`,
+      templateName: 'vendor-rejected',
+      context: payload,
+    });
+  }
 }

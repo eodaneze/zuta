@@ -17,6 +17,7 @@ import { CreateVendorProfileDto } from './dto/create-vendor-profile.dto';
 import { UpdateVendorProfileDto } from './dto/update-vendor-profile.dto';
 import { SubmitVendorKycDto } from './dto/submit-vendor-kyc.dto';
 import { VendorStatus } from './enums/vendor-status.enum';
+import { MailService } from '../mail/mail.service';
 
 @Injectable()
 export class VendorService {
@@ -28,6 +29,7 @@ export class VendorService {
     private readonly usersService: UsersService,
     private readonly uploadsService: UploadsService,
     private readonly cloudinaryService: CloudinaryService,
+    private readonly mailService: MailService,
   ) {}
 
   async becomeVendor(userId: string) {
@@ -146,7 +148,7 @@ export class VendorService {
     const updatedProfile = await this.vendorProfileModel.findOneAndUpdate(
       { userId: new Types.ObjectId(userId) },
       updatePayload,
-      { new: true },
+      { returnDocument: 'after' },
     );
 
     return {
@@ -224,7 +226,7 @@ export class VendorService {
           status: VendorStatus.PENDING_REVIEW,
           rejectionReason: '',
         },
-        { new: true },
+        { returnDocument: 'after' },
       );
     }
 
@@ -234,7 +236,7 @@ export class VendorService {
         onboardingStatus: VendorStatus.PENDING_REVIEW,
         rejectionReason: '',
       },
-      { new: true },
+      { returnDocument: 'after' },
     );
 
     await this.usersService.markVendorOnboardingComplete(userId);
@@ -264,6 +266,206 @@ export class VendorService {
         profile,
         kyc,
       },
+    };
+  }
+
+  async adminGetStores(status?: VendorStatus, search?: string) {
+    const query: Record<string, any> = {};
+
+    if (status) {
+      query.onboardingStatus = status;
+    }
+
+    if (search) {
+      query.$or = [
+        { storeName: { $regex: search, $options: 'i' } },
+        { storeCategory: { $regex: search, $options: 'i' } },
+        { storeDescription: { $regex: search, $options: 'i' } },
+      ];
+    }
+
+    const stores = await this.vendorProfileModel
+      .find(query)
+      .populate('userId', 'fullName email phone country roles isVendor')
+      .sort({ createdAt: -1 });
+
+    return {
+      message: 'Vendor stores fetched successfully',
+      data: stores,
+    };
+  }
+
+  async adminGetKycs(status?: VendorStatus, search?: string) {
+    const baseQuery: Record<string, any> = {};
+
+    if (status) {
+      baseQuery.status = status;
+    }
+
+    let kycs = await this.vendorKycModel
+      .find(baseQuery)
+      .populate('userId', 'fullName email phone country roles isVendor')
+      .sort({ createdAt: -1 });
+
+    if (search) {
+      const normalized = search.toLowerCase();
+      kycs = kycs.filter((item: any) => {
+        const user = item.userId;
+        if (!user) return false;
+
+        return (
+          user.fullName?.toLowerCase().includes(normalized) ||
+          user.email?.toLowerCase().includes(normalized) ||
+          user.phone?.toLowerCase().includes(normalized)
+        );
+      });
+    }
+
+    return {
+      message: 'Vendor KYC submissions fetched successfully',
+      data: kycs,
+    };
+  }
+
+  async adminApproveStore(vendorProfileId: string) {
+    const store = await this.vendorProfileModel
+      .findById(vendorProfileId)
+      .populate('userId', 'fullName email');
+
+    if (!store) {
+      throw new NotFoundException('Vendor store not found');
+    }
+
+    store.onboardingStatus = VendorStatus.APPROVED;
+    store.rejectionReason = '';
+    await store.save();
+
+    const user: any = store.userId;
+
+    if (user?.email) {
+      await this.mailService.sendVendorApprovedEmail(user.email, {
+        name: user.fullName,
+        subject: 'store profile',
+      });
+    }
+
+    return {
+      message: 'Vendor store approved successfully',
+      data: store,
+    };
+  }
+
+  async adminRejectStore(vendorProfileId: string, reason: string) {
+    if (!reason) {
+      throw new BadRequestException('Rejection reason is required');
+    }
+
+    const store = await this.vendorProfileModel
+      .findById(vendorProfileId)
+      .populate('userId', 'fullName email');
+
+    if (!store) {
+      throw new NotFoundException('Vendor store not found');
+    }
+
+    store.onboardingStatus = VendorStatus.REJECTED;
+    store.rejectionReason = reason;
+    await store.save();
+
+    const user: any = store.userId;
+
+    if (user?.email) {
+      await this.mailService.sendVendorRejectedEmail(user.email, {
+        name: user.fullName,
+        subject: 'store profile',
+        reason,
+      });
+    }
+
+    return {
+      message: 'Vendor store rejected successfully',
+      data: store,
+    };
+  }
+
+  async adminApproveKyc(vendorKycId: string) {
+    const kyc = await this.vendorKycModel
+      .findById(vendorKycId)
+      .populate('userId', 'fullName email');
+
+    if (!kyc) {
+      throw new NotFoundException('Vendor KYC not found');
+    }
+
+    kyc.status = VendorStatus.APPROVED;
+    kyc.rejectionReason = '';
+    await kyc.save();
+
+    const store = await this.vendorProfileModel.findOne({
+      userId: kyc.userId,
+    });
+
+    if (store) {
+      store.onboardingStatus = VendorStatus.APPROVED;
+      store.rejectionReason = '';
+      await store.save();
+    }
+
+    const user: any = kyc.userId;
+
+    if (user?.email) {
+      await this.mailService.sendVendorApprovedEmail(user.email, {
+        name: user.fullName,
+        subject: 'KYC submission',
+      });
+    }
+
+    return {
+      message: 'Vendor KYC approved successfully',
+      data: kyc,
+    };
+  }
+
+  async adminRejectKyc(vendorKycId: string, reason: string) {
+    if (!reason) {
+      throw new BadRequestException('Rejection reason is required');
+    }
+
+    const kyc = await this.vendorKycModel
+      .findById(vendorKycId)
+      .populate('userId', 'fullName email');
+
+    if (!kyc) {
+      throw new NotFoundException('Vendor KYC not found');
+    }
+
+    kyc.status = VendorStatus.REJECTED;
+    kyc.rejectionReason = reason;
+    await kyc.save();
+
+    const store = await this.vendorProfileModel.findOne({
+      userId: kyc.userId,
+    });
+
+    if (store) {
+      store.onboardingStatus = VendorStatus.REJECTED;
+      store.rejectionReason = reason;
+      await store.save();
+    }
+
+    const user: any = kyc.userId;
+
+    if (user?.email) {
+      await this.mailService.sendVendorRejectedEmail(user.email, {
+        name: user.fullName,
+        subject: 'KYC submission',
+        reason,
+      });
+    }
+
+    return {
+      message: 'Vendor KYC rejected successfully',
+      data: kyc,
     };
   }
 }
