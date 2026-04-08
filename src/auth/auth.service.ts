@@ -12,6 +12,7 @@ import { TokenService } from '../token/token.service';
 import { TokenType } from '../common/enums/token-type.enum';
 import { generateFourDigitCode } from '../common/utils/code.utils';
 import { MailService } from '../mail/mail.service';
+import { UserDocument } from 'src/users/schemas/user.schema';
 
 @Injectable()
 export class AuthService {
@@ -228,11 +229,11 @@ export class AuthService {
     return this.usersService.findById(userId);
   }
 
-  private async generateToken(user: any) {
+  private async generateToken(user: UserDocument) {
     return this.jwtService.signAsync({
       sub: user._id,
       email: user.email,
-      role: user.role,
+      roles: user.roles,
     });
   }
 }

@@ -13,7 +13,8 @@ interface CreateUserInput {
   password: string;
   phone?: string;
   country?: string;
-  role?: UserRole;
+  roles?: UserRole[];
+  isVendor?: boolean;
 }
 
 @Injectable()
