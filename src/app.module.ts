@@ -8,6 +8,7 @@ import { MailModule } from './mail/mail.module';
 import { VendorModule } from './vendor/vendor.module';
 import { UploadsModule } from './uploads/uploads.module';
 import { CloudinaryModule } from './cloudinary/cloudinary.module';
+import { VendorAuthModule } from './vendor-auth/vendor-auth.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { CloudinaryModule } from './cloudinary/cloudinary.module';
     CloudinaryModule,
     UploadsModule,
     VendorModule,
+    VendorAuthModule,
   ],
 })
 export class AppModule {}
