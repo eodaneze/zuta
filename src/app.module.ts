@@ -10,6 +10,7 @@ import { UploadsModule } from './uploads/uploads.module';
 import { CloudinaryModule } from './cloudinary/cloudinary.module';
 import { VendorAuthModule } from './vendor-auth/vendor-auth.module';
 import { AdminModule } from './admin/admin.module';
+import { ProductModule } from './product/product.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { AdminModule } from './admin/admin.module';
     VendorAuthModule,
     VendorModule,
     AdminModule,
+    ProductModule,
   ],
 })
 export class AppModule {}
