@@ -66,4 +66,23 @@ export class UsersService {
       { new: true },
     );
   }
+
+  async addVendorRole(userId: string) {
+  return this.userModel.findByIdAndUpdate(
+    userId,
+    {
+      $set: { isVendor: true },
+      $addToSet: { role: 'vendor' },
+    },
+    { new: true },
+  );
+}
+
+  async markVendorOnboardingComplete(userId: string) {
+    return this.userModel.findByIdAndUpdate(
+      userId,
+      { hasCompletedVendorOnboarding: true },
+      { new: true },
+    );
+  }
 }

@@ -62,7 +62,7 @@ export class AuthService {
           email: user.email,
           phone: user.phone,
           country: user.country,
-          role: user.role,
+          roles: user.roles,
           isEmailVerified: user.isEmailVerified,
         },
       },
@@ -76,6 +76,9 @@ export class AuthService {
       throw new UnauthorizedException('Invalid email or password');
     }
 
+    if(!user.isEmailVerified) {
+      throw new UnauthorizedException('Email is not verified. Please verify your email to login');
+    }
     const isPasswordValid = await bcrypt.compare(password, user.password);
 
     if (!isPasswordValid) {
@@ -94,7 +97,7 @@ export class AuthService {
           email: user.email,
           phone: user.phone,
           country: user.country,
-          role: user.role,
+          roles: user.roles,
           isEmailVerified: user.isEmailVerified,
         },
       },

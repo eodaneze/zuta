@@ -29,5 +29,5 @@ export class RegisterDto {
   @ApiPropertyOptional({ enum: UserRole, example: UserRole.CUSTOMER })
   @IsOptional()
   @IsEnum(UserRole)
-  role?: UserRole;
+  roles?: UserRole;
 }

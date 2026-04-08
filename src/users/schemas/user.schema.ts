@@ -26,14 +26,20 @@ export class User {
   @Prop({ default: '' })
   country!: string;
 
-  @Prop({ enum: UserRole, default: UserRole.CUSTOMER })
-  role!: UserRole;
+  @Prop({ type: [String], enum: UserRole, default: [UserRole.CUSTOMER] })
+  roles!: UserRole[];
 
   @Prop({ default: true })
   isActive!: boolean;
 
   @Prop({ default: false })
   isEmailVerified!: boolean;
+
+  @Prop({default:false})
+  isVendor!: boolean;
+
+  @Prop({default: false})
+  hasCompletedVendorOnboarding!: boolean;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);
