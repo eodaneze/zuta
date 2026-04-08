@@ -1,9 +1,28 @@
 import { Module } from '@nestjs/common';
-import { ProductService } from './product.service';
+import { MongooseModule } from '@nestjs/mongoose';
 import { ProductController } from './product.controller';
+import { ProductService } from './product.service';
+import { Product, ProductSchema } from './schemas/product.schema';
+import {
+  VendorProfile,
+  VendorProfileSchema,
+} from '../vendor/schemas/vendor-profile.schema';
+import { VendorKyc, VendorKycSchema } from '../vendor/schemas/vendor-kyc.schema';
+import { UploadsModule } from '../uploads/uploads.module';
+import { CloudinaryModule } from '../cloudinary/cloudinary.module';
 
 @Module({
+  imports: [
+    MongooseModule.forFeature([
+      { name: Product.name, schema: ProductSchema },
+      { name: VendorProfile.name, schema: VendorProfileSchema },
+      { name: VendorKyc.name, schema: VendorKycSchema },
+    ]),
+    UploadsModule,
+    CloudinaryModule,
+  ],
+  controllers: [ProductController],
   providers: [ProductService],
-  controllers: [ProductController]
+  exports: [ProductService],
 })
 export class ProductModule {}
