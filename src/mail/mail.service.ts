@@ -1,119 +1,146 @@
 import { Injectable, InternalServerErrorException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import * as nodemailer from 'nodemailer';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as handlebars from 'handlebars';
+import axios from 'axios';
 
 @Injectable()
 export class MailService {
-  private transporter: nodemailer.Transporter;
+  constructor(private readonly configService: ConfigService) {}
 
-  constructor(private readonly configService: ConfigService) {
-    this.transporter = nodemailer.createTransport({
-      host: this.configService.get<string>('MAIL_HOST'),
-      port: Number(this.configService.get<string>('MAIL_PORT')) || 587,
-      secure: false,
-      auth: {
-        user: this.configService.get<string>('MAIL_USER'),
-        pass: this.configService.get<string>('MAIL_PASS'),
-      },
-    });
-  }
-
-  private compileTemplate(
+  private renderTemplate(
     templateName: string,
     context: Record<string, any>,
-  ): string {
-    const templatePath = path.join(
-      process.cwd(),
-      'src',
-      'mail',
-      'templates',
-      `${templateName}.hbs`,
-    );
+  ) {
+    const templatesDir = path.resolve(process.cwd(), 'src/mail/templates');
+    const filePath = path.join(templatesDir, `${templateName}.hbs`);
+    const source = fs.readFileSync(filePath, 'utf8');
+    const template = handlebars.compile(source);
 
-    const templateSource = fs.readFileSync(templatePath, 'utf-8');
-    const compiledTemplate = handlebars.compile(templateSource);
-
-    return compiledTemplate(context);
+    return template(context);
   }
 
-  async sendMail(params: {
-    to: string;
-    subject: string;
-    templateName: string;
-    context: Record<string, any>;
-  }) {
-    const { to, subject, templateName, context } = params;
+  private async sendViaBrevo(
+    toEmail: string,
+    subject: string,
+    htmlContent: string,
+  ) {
+    const apiKey = this.configService.get<string>('BROVO_API_KEY');
+    const senderEmail = this.configService.get<string>('MAILER_SENDER');
+
+    const ip = await axios.get('https://api.ipify.org?format=json');
+    console.log('CURRENT IP:', ip.data);
+
+    if (!apiKey) {
+      throw new InternalServerErrorException(
+        'Brevo API key is not configured',
+      );
+    }
+
+    if (!senderEmail) {
+      throw new InternalServerErrorException(
+        'Sender email is not configured',
+      );
+    }
 
     try {
-      const html = this.compileTemplate(templateName, context);
+      const response = await axios.post(
+        'https://api.brevo.com/v3/smtp/email',
+        {
+          sender: {
+            email: senderEmail,
+            name: 'ZutaOnline',
+          },
+          to: [{ email: toEmail }],
+          subject,
+          htmlContent,
+        },
+        {
+          headers: {
+            'api-key': apiKey,
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+          },
+        },
+      );
 
-      await this.transporter.sendMail({
-        from: this.configService.get<string>('MAIL_FROM'),
-        to,
-        subject,
-        html,
-      });
-    } catch (error) {
-      console.error('Mail sending error:', error);
-      throw new InternalServerErrorException('Unable to send email');
+      return response.data;
+    } catch (error: any) {
+      console.error(
+        'Brevo sending error:',
+        error?.response?.data || error.message,
+      );
+      throw new InternalServerErrorException(
+        error?.response?.data?.message || 'Failed to send email',
+      );
     }
   }
 
-  async sendVerificationEmail(to: string, payload: {
-    name: string;
-    code: string;
-  }) {
-    return this.sendMail({
-      to,
-      subject: 'Verify your email',
-      templateName: 'verify-email',
-      context: payload,
+  async sendVerificationEmail(email: string, name: string, code: string) {
+    const html = this.renderTemplate('verify-email', {
+      name,
+      code,
     });
+
+    await this.sendViaBrevo(email, 'Verify your email', html);
   }
 
-  async sendResetPasswordEmail(to: string, payload: {
-    name: string;
-    code: string;
-  }) {
-    return this.sendMail({
-      to,
-      subject: 'Reset your password',
-      templateName: 'reset-password',
-      context: payload,
+  async sendResetPasswordEmail(email: string, name: string, code: string) {
+    const html = this.renderTemplate('reset-password', {
+      name,
+      code,
     });
+
+    await this.sendViaBrevo(email, 'Reset your password', html);
   }
 
-  async sendVendorApprovedEmail(
-  to: string,
-  payload: {
-    name: string;
-    subject: string;
-  },
-) {
-  return this.sendMail({
-    to,
-    subject: `${payload.subject} approved`,
-    templateName: 'vendor-approved',
-    context: payload,
-  });
-}
+  async sendVendorApprovedEmail(email: string, name: string) {
+    const html = this.renderTemplate('vendor-approved', {
+      name,
+    });
+
+    await this.sendViaBrevo(email, 'Store profile approved', html);
+  }
 
   async sendVendorRejectedEmail(
-    to: string,
-    payload: {
-      name: string;
-      subject: string;
-      reason: string;
-    },
+    email: string,
+    name: string,
+    reason: string,
   ) {
-    return this.sendMail({
-      to,
-      subject: `${payload.subject} rejected`,
-      templateName: 'vendor-rejected',
-      context: payload,
+    const html = this.renderTemplate('vendor-rejected', {
+      name,
+      reason,
     });
+
+    await this.sendViaBrevo(email, 'Store profile rejected', html);
+  }
+
+  async sendProductApprovedEmail(
+    email: string,
+    name: string,
+    productName: string,
+  ) {
+    const html = this.renderTemplate('product-approved', {
+      name,
+      productName,
+    });
+
+    await this.sendViaBrevo(email, 'Product approved', html);
+  }
+
+  async sendProductRejectedEmail(
+    email: string,
+    name: string,
+    productName: string,
+    reason: string,
+  ) {
+    const html = this.renderTemplate('product-rejected', {
+      name,
+      productName,
+      reason,
+    });
+
+    await this.sendViaBrevo(email, 'Product rejected', html);
   }
 }

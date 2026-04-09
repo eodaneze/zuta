@@ -4,6 +4,8 @@ import {  Model } from 'mongoose';
 import { User, UserDocument, UserRole } from '../users/schemas/user.schema';
 import { VendorService } from '../vendor/vendor.service';
 import { VendorStatus } from '../vendor/enums/vendor-status.enum';
+import { ProductService } from 'src/product/product.service';
+import { ProductStatus } from 'src/product/enums/product-status.enum';
 
 @Injectable()
 export class AdminService {
@@ -11,6 +13,7 @@ export class AdminService {
     @InjectModel(User.name)
     private readonly userModel: Model<UserDocument>,
     private readonly vendorService: VendorService,
+    private readonly productService: ProductService,
   ) {}
 
   async getUsers(params: {
@@ -92,5 +95,23 @@ export class AdminService {
 
   async rejectKyc(vendorKycId: string, reason: string) {
     return this.vendorService.adminRejectKyc(vendorKycId, reason);
+  }
+
+   async getProducts(params: {
+    search?: string;
+    category?: string;
+    status?: ProductStatus;
+    page?: number;
+    limit?: number;
+  }) {
+    return this.productService.adminGetProducts(params);
+  }
+
+  async approveProduct(productId: string) {
+    return this.productService.adminApproveProduct(productId);
+  }
+
+  async rejectProduct(productId: string, reason: string) {
+    return this.productService.adminRejectProduct(productId, reason);
   }
 }

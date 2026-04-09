@@ -10,6 +10,8 @@ import {
 import { VendorKyc, VendorKycSchema } from '../vendor/schemas/vendor-kyc.schema';
 import { UploadsModule } from '../uploads/uploads.module';
 import { CloudinaryModule } from '../cloudinary/cloudinary.module';
+import { MailModule } from '../mail/mail.module';
+import { NotificationModule } from '../notification/notification.module';
 
 @Module({
   imports: [
@@ -20,6 +22,8 @@ import { CloudinaryModule } from '../cloudinary/cloudinary.module';
     ]),
     UploadsModule,
     CloudinaryModule,
+    MailModule,
+    NotificationModule,
   ],
   controllers: [ProductController],
   providers: [ProductService],

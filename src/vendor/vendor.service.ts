@@ -383,11 +383,9 @@ export class VendorService {
 
     const user: any = store.userId;
 
+    const name = user.fullName;
     if (user?.email) {
-      await this.mailService.sendVendorApprovedEmail(user.email, {
-        name: user.fullName,
-        subject: 'store profile',
-      });
+      await this.mailService.sendVendorApprovedEmail(user.email, name);
     }
 
     return {
@@ -415,12 +413,9 @@ export class VendorService {
 
     const user: any = store.userId;
 
+    const name = user.fullName;
     if (user?.email) {
-      await this.mailService.sendVendorRejectedEmail(user.email, {
-        name: user.fullName,
-        subject: 'store profile',
-        reason,
-      });
+      await this.mailService.sendVendorRejectedEmail(user.email, name , reason);
     }
 
     return {
@@ -454,11 +449,9 @@ export class VendorService {
 
     const user: any = kyc.userId;
 
+    const name = user.fullName;
     if (user?.email) {
-      await this.mailService.sendVendorApprovedEmail(user.email, {
-        name: user.fullName,
-        subject: 'KYC submission',
-      });
+      await this.mailService.sendVendorApprovedEmail(user.email, name);
     }
 
     return {
@@ -496,12 +489,9 @@ export class VendorService {
 
     const user: any = kyc.userId;
 
+    const name = user.fullName;
     if (user?.email) {
-      await this.mailService.sendVendorRejectedEmail(user.email, {
-        name: user.fullName,
-        subject: 'KYC submission',
-        reason,
-      });
+      await this.mailService.sendVendorRejectedEmail(user.email, name, reason);
     }
 
     return {

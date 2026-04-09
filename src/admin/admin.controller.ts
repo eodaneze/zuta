@@ -21,6 +21,7 @@ import { AdminReviewDto } from './dto/admin-review.dto';
 import { AdminQueryUsersDto } from './dto/admin-query-users.dto';
 import { AdminQueryVendorStoreDto } from './dto/admin-query-vendor-store.dto';
 import { AdminQueryVendorKycDto } from './dto/admin-query-vendor-kyc.dto';
+import { AdminQueryProductsDto } from '../product/dto/admin-query-products.dto';
 
 @ApiTags('Admin')
 @ApiBearerAuth()
@@ -76,5 +77,26 @@ export class AdminController {
     @Body() dto: AdminReviewDto,
   ) {
     return this.adminService.rejectKyc(vendorKycId, dto.reason || '');
+  }
+
+  @Get('products')
+  @ApiOperation({ summary: 'Get all products with search, filter and pagination' })
+  getProducts(@Query() query: AdminQueryProductsDto) {
+    return this.adminService.getProducts(query);
+  }
+
+  @Patch('products/:productId/approve')
+  @ApiOperation({ summary: 'Approve product' })
+  approveProduct(@Param('productId') productId: string) {
+    return this.adminService.approveProduct(productId);
+  }
+
+  @Patch('products/:productId/reject')
+  @ApiOperation({ summary: 'Reject product with reason' })
+  rejectProduct(
+    @Param('productId') productId: string,
+    @Body() dto: AdminReviewDto,
+  ) {
+    return this.adminService.rejectProduct(productId, dto.reason || '');
   }
 }

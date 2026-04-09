@@ -47,10 +47,8 @@ export class VendorAuthService {
       ),
     });
 
-    await this.mailService.sendVerificationEmail(user.email, {
-      name: user.fullName,
-      code,
-    });
+    const name = user.fullName;
+    await this.mailService.sendVerificationEmail(user.email, name, code);
 
     const accessToken = await this.jwtService.signAsync({
       sub: user._id,

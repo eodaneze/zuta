@@ -45,10 +45,9 @@ export class AuthService {
       ),
     });
 
-    await this.mailService.sendVerificationEmail(user.email, {
-      name: user.fullName,
-      code,
-    });
+    const name = user.fullName
+
+    await this.mailService.sendVerificationEmail(user.email, name, code);
 
     const token = await this.generateToken(user);
 
@@ -129,10 +128,9 @@ export class AuthService {
       ),
     });
 
-    await this.mailService.sendVerificationEmail(user.email, {
-      name: user.fullName,
-      code,
-    });
+    const name = user.fullName;
+
+    await this.mailService.sendVerificationEmail(user.email, name, code);
 
     return {
       message: 'Verification code sent successfully',
@@ -188,10 +186,8 @@ export class AuthService {
       ),
     });
 
-    await this.mailService.sendResetPasswordEmail(user.email, {
-      name: user.fullName,
-      code,
-    });
+    const name = user.fullName
+    await this.mailService.sendResetPasswordEmail(user.email, name, code);
 
     return {
       message: 'Password reset code sent successfully',

@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&display=swap');
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      body {
+        font-family: 'Inter', sans-serif;
+        font-weight: 300;
+      }
+      .container {
+        width: 80%;
+        margin: auto;
+      }
+      .btn {
+        -webkit-border-radius: 0;
+        -moz-border-radius: 0;
+        color: #ffffff;
+        background:  #2563eb;;
+        padding: 15px 40px 15px 40px;
+        text-decoration: none;
+        border: none;
+      }
+
+      .btn:hover {
+        background: #02014a;
+        text-decoration: none;
+      }
+
+      .header {
+        height: 110px;
+        width: 100%;
+        display: flex;
+        justify-content: flex-start;
+        align-items: center;
+        background: linear-gradient(rgba(0, 0, 0, 0.2), rgba(0, 0, 0, 0.3)), 
+                        url('') no-repeat center center;;
+        background-size: 677px ;
+        border-radius: 5px;
+        
+      }
+      .main {
+        position: relative;
+      }
+
+      h2 {
+        font-size: 28px;
+        line-height: 28px;
+        margin: 28px 0;
+      }
+
+      h3 {
+        font-size: 18px;
+        margin-top: 54px;
+        margin-bottom: 20px;
+      }
+      p {
+        font-size: 14px;
+        line-height: 1.5;
+      }
+      .logo {
+      max-width: 160px;
+      height: auto;
+      display: block;
+      margin: auto; /* Center the image within its container */
+    }
+    h2{
+      color: #2563eb;
+    }
+
+
+    </style>
+    
+    <title>Zutaonline Email</title>
+  </head>
+  <body>
+    <section class="main">
+      
+      <div class="header" >
+        <div class="container">
+          
+        </div>
+      </div>
+
+      <div class="content container">
+        <h3>hello! {{name}} 😃</h3> 
+        <p>
+          Your product <strong>{{productName}}</strong> has been approved and is now live on our platform. We are excited to have you as part of our community and look forward to seeing your product thrive. If you have any questions or need assistance, please don't hesitate to reach out to our support team.
+        </p>
+          <br/>
+      
+        <br/><br/>
+        <p>
+          Warmest Regards,<br />
+          <a href="">Zutaonline Team</a><br />
+        </p>
+        <br><br>
+         <p>
+        
+      </div>
+    </section>
+  </body>
+</html>

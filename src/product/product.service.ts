@@ -11,11 +11,18 @@ import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { ProductQueryDto } from './dto/product-query.dto';
 import { UploadsService } from '../uploads/uploads.service';
-import { VendorProfile, VendorProfileDocument } from '../vendor/schemas/vendor-profile.schema';
+import {
+  VendorProfile,
+  VendorProfileDocument,
+} from '../vendor/schemas/vendor-profile.schema';
 import { VendorKyc, VendorKycDocument } from '../vendor/schemas/vendor-kyc.schema';
 import { VendorStatus } from '../vendor/enums/vendor-status.enum';
 import { ProductStatus } from './enums/product-status.enum';
 import { CloudinaryService } from '../cloudinary/cloudinary.service';
+import { MailService } from '../mail/mail.service';
+import { NotificationService } from '../notification/notification.service';
+import { NotificationType } from '../notification/enums/notification-type.enum';
+import { connect } from 'http2';
 
 @Injectable()
 export class ProductService {
@@ -28,6 +35,8 @@ export class ProductService {
     private readonly vendorKycModel: Model<VendorKycDocument>,
     private readonly uploadsService: UploadsService,
     private readonly cloudinaryService: CloudinaryService,
+    private readonly mailService: MailService,
+    private readonly notificationService: NotificationService,
   ) {}
 
   private async validateApprovedVendor(userId: string) {
@@ -35,7 +44,6 @@ export class ProductService {
       userId: new Types.ObjectId(userId),
     });
 
-    console.log(`the vendor is is ${userId}` )
     if (!vendorProfile) {
       throw new ForbiddenException('Vendor store profile not found');
     }
@@ -125,7 +133,7 @@ export class ProductService {
     const limit = query.limit ?? 10;
     const skip = (page - 1) * limit;
 
-    const filter:  Record<string, any> = {
+    const filter: Record<string, any> = {
       vendorId: new Types.ObjectId(userId),
       isDeleted: false,
     };
@@ -148,11 +156,7 @@ export class ProductService {
     }
 
     const [products, total] = await Promise.all([
-      this.productModel
-        .find(filter)
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(limit),
+      this.productModel.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit),
       this.productModel.countDocuments(filter),
     ]);
 
@@ -275,6 +279,168 @@ export class ProductService {
 
     return {
       message: 'Product deleted successfully',
+    };
+  }
+
+  async adminGetProducts(query: {
+    search?: string;
+    category?: string;
+    status?: ProductStatus;
+    page?: number;
+    limit?: number;
+  }) {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 10;
+    const skip = (page - 1) * limit;
+
+    const filter: Record<string, any> = {
+      isDeleted: false,
+    };
+
+    if (query.category) {
+      filter.category = query.category;
+    }
+
+    if (query.status) {
+      filter.status = query.status;
+    }
+
+    if (query.search) {
+      filter.$or = [
+        { name: { $regex: query.search, $options: 'i' } },
+        { description: { $regex: query.search, $options: 'i' } },
+        { sku: { $regex: query.search, $options: 'i' } },
+        { category: { $regex: query.search, $options: 'i' } },
+      ];
+    }
+
+    const [products, total] = await Promise.all([
+      this.productModel
+        .find(filter)
+        .populate('vendorId', 'fullName email phone')
+        .populate('vendorProfileId', 'storeName storeCategory')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit),
+      this.productModel.countDocuments(filter),
+    ]);
+
+    return {
+      message: 'Products fetched successfully',
+      data: products,
+      meta: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  async adminApproveProduct(productId: string) {
+    const product = await this.productModel
+      .findOne({
+        _id: productId,
+        isDeleted: false,
+      })
+      .populate('vendorId', 'fullName email');
+
+    if (!product) {
+      throw new NotFoundException('Product not found');
+    }
+
+    product.status = ProductStatus.APPROVED;
+    product.rejectionReason = '';
+    await product.save();
+
+    const vendor: any = product.vendorId;
+
+    const name = vendor.fullName;
+    const productName = product.name;
+    if (vendor?.email) {
+      await this.mailService.sendProductApprovedEmail(vendor.email, name, productName);
+    }
+
+    await this.notificationService.createNotification({
+      userId: vendor._id.toString(),
+      title: 'Product approved',
+      message: `Your product "${product.name}" has been approved.`,
+      type: NotificationType.PRODUCT_APPROVED,
+      metadata: {
+        productId: product._id,
+        productName: product.name,
+        status: ProductStatus.APPROVED,
+      },
+    });
+
+    await this.notificationService.sendBrowserPushToUser(
+      vendor._id.toString(),
+      {
+        title: 'Product approved',
+        body: `Your product "${product.name}" has been approved.`,
+        url: '/vendor/products',
+      },
+    );
+
+    return {
+      message: 'Product approved successfully',
+      data: product,
+    };
+  }
+
+  async adminRejectProduct(productId: string, reason: string) {
+    if (!reason) {
+      throw new BadRequestException('Rejection reason is required');
+    }
+
+    const product = await this.productModel
+      .findOne({
+        _id: productId,
+        isDeleted: false,
+      })
+      .populate('vendorId', 'fullName email');
+
+    if (!product) {
+      throw new NotFoundException('Product not found');
+    }
+
+    product.status = ProductStatus.REJECTED;
+    product.rejectionReason = reason;
+    await product.save();
+
+    const vendor: any = product.vendorId;
+
+    const name = vendor.fullName;
+    const productName = product.name;
+    if (vendor?.email) {
+      await this.mailService.sendProductRejectedEmail(vendor.email, name, productName, reason);
+    }
+
+    await this.notificationService.createNotification({
+      userId: vendor._id.toString(),
+      title: 'Product rejected',
+      message: `Your product "${product.name}" was rejected. Reason: ${reason}`,
+      type: NotificationType.PRODUCT_REJECTED,
+      metadata: {
+        productId: product._id,
+        productName: product.name,
+        status: ProductStatus.REJECTED,
+        reason,
+      },
+    });
+
+    await this.notificationService.sendBrowserPushToUser(
+      vendor._id.toString(),
+      {
+        title: 'Product rejected',
+        body: `Your product "${product.name}" was rejected.`,
+        url: '/vendor/products',
+      },
+    );
+
+    return {
+      message: 'Product rejected successfully',
+      data: product,
     };
   }
 }
