@@ -29,8 +29,8 @@ export class MailService {
     const apiKey = this.configService.get<string>('BROVO_API_KEY');
     const senderEmail = this.configService.get<string>('MAILER_SENDER');
 
-    const ip = await axios.get('https://api.ipify.org?format=json');
-    console.log('CURRENT IP:', ip.data);
+    // const ip = await axios.get('https://api.ipify.org?format=json');
+    // console.log('CURRENT IP:', ip.data);
 
     if (!apiKey) {
       throw new InternalServerErrorException(
