@@ -73,7 +73,7 @@ export class UsersService {
     userId,
     {
       $set: { isVendor: true },
-      $addToSet: { role: 'vendor' },
+      $addToSet: { roles: 'vendor' },
     },
     { new: true },
   );
