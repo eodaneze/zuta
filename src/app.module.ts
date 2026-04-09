@@ -11,6 +11,7 @@ import { CloudinaryModule } from './cloudinary/cloudinary.module';
 import { VendorAuthModule } from './vendor-auth/vendor-auth.module';
 import { AdminModule } from './admin/admin.module';
 import { ProductModule } from './product/product.module';
+import { NotificationModule } from './notification/notification.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { ProductModule } from './product/product.module';
     VendorModule,
     AdminModule,
     ProductModule,
+    NotificationModule,
   ],
 })
 export class AppModule {}
