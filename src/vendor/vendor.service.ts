@@ -18,6 +18,7 @@ import { UpdateVendorProfileDto } from './dto/update-vendor-profile.dto';
 import { SubmitVendorKycDto } from './dto/submit-vendor-kyc.dto';
 import { VendorStatus } from './enums/vendor-status.enum';
 import { MailService } from '../mail/mail.service';
+import { VendorFollowService } from 'src/vendor-follow/vendor-follow.service';
 
 @Injectable()
 export class VendorService {
@@ -30,6 +31,7 @@ export class VendorService {
     private readonly uploadsService: UploadsService,
     private readonly cloudinaryService: CloudinaryService,
     private readonly mailService: MailService,
+    private readonly vendorFollowService: VendorFollowService,
   ) {}
 
   async becomeVendor(userId: string) {
@@ -499,4 +501,57 @@ export class VendorService {
       data: kyc,
     };
   }
+
+
+  async getVendorPublicDetails(vendorProfileId: string, currentUserId?: string) {
+  const vendorProfile = await this.vendorProfileModel
+    .findOne({
+      _id: vendorProfileId,
+      onboardingStatus: VendorStatus.APPROVED,
+    })
+    .populate('userId', 'fullName email country');
+
+  if (!vendorProfile) {
+    throw new NotFoundException('Vendor not found');
+  }
+
+  const vendorUser: any = vendorProfile.userId;
+
+  const followersCount =
+    await this.vendorFollowService.getFollowersCountByVendorProfileId(
+      vendorProfileId,
+    );
+
+  let isFollowing = false;
+
+  if (currentUserId) {
+    isFollowing = await this.vendorFollowService.isFollowingVendor(
+      currentUserId,
+      vendorUser._id.toString(),
+    );
+  }
+
+  return {
+    message: 'Vendor details fetched successfully',
+    data: {
+      vendor: {
+        id: vendorUser._id,
+        fullName: vendorUser.fullName,
+        email: vendorUser.email,
+        country: vendorUser.country,
+      },
+      store: {
+        id: vendorProfile._id,
+        storeName: vendorProfile.storeName,
+        storeDescription: vendorProfile.storeDescription,
+        storeCategory: vendorProfile.storeCategory,
+        storeLogoUrl: vendorProfile.storeLogoUrl,
+        storeBannerUrl: vendorProfile.storeBannerUrl,
+        onboardingStatus: vendorProfile.onboardingStatus,
+      },
+      followersCount,
+      isFollowing,
+    },
+  };
+}
 }

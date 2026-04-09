@@ -5,6 +5,7 @@ import {
   Get,
   Patch,
   Post,
+  Param,
   UploadedFiles,
   UseGuards,
   UseInterceptors,
@@ -26,19 +27,27 @@ import { UpdateVendorProfileDto } from './dto/update-vendor-profile.dto';
 import { SubmitVendorKycDto } from './dto/submit-vendor-kyc.dto';
 
 @ApiTags('Vendor')
-@ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
 @Controller('vendor')
 export class VendorController {
   constructor(private readonly vendorService: VendorService) {}
 
+  @Get(':vendorProfileId')
+  @ApiOperation({ summary: 'Get public vendor details' })
+  getVendorPublicDetails(@Param('vendorProfileId') vendorProfileId: string) {
+    return this.vendorService.getVendorPublicDetails(vendorProfileId);
+  }
+
   @Post('become-vendor')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Enable vendor access for the current user' })
   becomeVendor(@CurrentUser() user: any, @Body() _dto: BecomeVendorDto) {
     return this.vendorService.becomeVendor(user._id.toString());
   }
 
   @Post('store-profile')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
   @ApiConsumes('multipart/form-data')
   @ApiOperation({ summary: 'Create vendor store profile with logo and banner' })
   @ApiBody({
@@ -81,6 +90,8 @@ export class VendorController {
   }
 
   @Patch('store-profile')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
   @ApiConsumes('multipart/form-data')
   @ApiOperation({ summary: 'Update vendor store profile' })
   @ApiBody({
@@ -122,6 +133,8 @@ export class VendorController {
   }
 
   @Post('kyc')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
   @ApiConsumes('multipart/form-data')
   @ApiOperation({ summary: 'Submit vendor KYC documents' })
   @ApiBody({
@@ -172,7 +185,9 @@ export class VendorController {
     );
   }
 
-  @Get('me')
+  @Get('me/profile')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Get current user vendor onboarding profile' })
   getMyVendorProfile(@CurrentUser() user: any) {
     return this.vendorService.getMyVendorProfile(user._id.toString());

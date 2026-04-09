@@ -11,6 +11,7 @@ import { UsersModule } from '../users/users.module';
 import { UploadsModule } from '../uploads/uploads.module';
 import { CloudinaryModule } from '../cloudinary/cloudinary.module';
 import { MailModule } from '../mail/mail.module';
+import { VendorFollowModule } from 'src/vendor-follow/vendor-follow.module';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { MailModule } from '../mail/mail.module';
     UploadsModule,
     CloudinaryModule,
     MailModule,
+    VendorFollowModule,
   ],
   controllers: [VendorController],
   providers: [VendorService],
