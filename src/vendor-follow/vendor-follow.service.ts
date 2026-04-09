@@ -14,6 +14,9 @@ import {
   VendorProfileDocument,
 } from '../vendor/schemas/vendor-profile.schema';
 import { VendorStatus } from '../vendor/enums/vendor-status.enum';
+import { NotificationService } from 'src/notification/notification.service';
+import { UsersService } from 'src/users/users.service';
+import { NotificationType } from 'src/notification/enums/notification-type.enum';
 
 @Injectable()
 export class VendorFollowService {
@@ -22,6 +25,8 @@ export class VendorFollowService {
     private readonly vendorFollowModel: Model<VendorFollowDocument>,
     @InjectModel(VendorProfile.name)
     private readonly vendorProfileModel: Model<VendorProfileDocument>,
+     private readonly notificationService: NotificationService,
+     private readonly userService: UsersService,
   ) {}
 
   async followVendor(userId: string, vendorProfileId: string) {
@@ -29,6 +34,13 @@ export class VendorFollowService {
       _id: vendorProfileId,
       onboardingStatus: VendorStatus.APPROVED,
     });
+
+ 
+    const user = await this.userService.findById(userId);
+    const userName = user.fullName;
+
+   
+
 
     if (!vendorProfile) {
       throw new NotFoundException('Vendor not found');
@@ -58,6 +70,18 @@ export class VendorFollowService {
     const followersCount = await this.vendorFollowModel.countDocuments({
       vendorId: new Types.ObjectId(vendorUserId),
     });
+
+    
+    await this.notificationService.createNotification({
+        userId: vendorProfile.userId.toString(),
+        title: 'New Follower',
+        message: `A user with the name ${userName} started following your store`,
+        type: NotificationType.FOLLOW_VENDOR,
+        metadata: {
+           followerId: userId.toString(),
+           followerName: userName
+        }
+    })
 
     return {
       message: 'Vendor followed successfully',

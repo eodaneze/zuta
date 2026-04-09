@@ -5,4 +5,5 @@ export enum NotificationType {
     STORE_REJECTED = 'store_rejected',
     KYC_APPROVED = 'kyc_approved',
     KYC_REJECTED = 'kyc_rejected',
+    FOLLOW_VENDOR = 'follow_vendor'
 }

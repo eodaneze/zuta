@@ -10,6 +10,8 @@ import {
   VendorProfile,
   VendorProfileSchema,
 } from '../vendor/schemas/vendor-profile.schema';
+import { NotificationModule } from 'src/notification/notification.module';
+import { UsersModule } from 'src/users/users.module';
 
 @Module({
   imports: [
@@ -17,6 +19,8 @@ import {
       { name: VendorFollow.name, schema: VendorFollowSchema },
       { name: VendorProfile.name, schema: VendorProfileSchema },
     ]),
+     NotificationModule,
+     UsersModule,
   ],
   controllers: [VendorFollowController],
   providers: [VendorFollowService],
