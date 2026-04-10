@@ -12,6 +12,7 @@ import { UploadsModule } from '../uploads/uploads.module';
 import { CloudinaryModule } from '../cloudinary/cloudinary.module';
 import { MailModule } from '../mail/mail.module';
 import { NotificationModule } from '../notification/notification.module';
+import { User, UserSchema } from 'src/users/schemas/user.schema';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { NotificationModule } from '../notification/notification.module';
       { name: Product.name, schema: ProductSchema },
       { name: VendorProfile.name, schema: VendorProfileSchema },
       { name: VendorKyc.name, schema: VendorKycSchema },
+      {name: User.name, schema: UserSchema}
     ]),
     UploadsModule,
     CloudinaryModule,

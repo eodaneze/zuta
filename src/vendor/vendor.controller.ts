@@ -6,6 +6,7 @@ import {
   Patch,
   Post,
   Param,
+  Query,
   UploadedFiles,
   UseGuards,
   UseInterceptors,
@@ -15,6 +16,7 @@ import {
   ApiBody,
   ApiConsumes,
   ApiOperation,
+  ApiQuery,
   ApiTags,
 } from '@nestjs/swagger';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
@@ -32,9 +34,21 @@ export class VendorController {
   constructor(private readonly vendorService: VendorService) {}
 
   @Get(':vendorProfileId')
-  @ApiOperation({ summary: 'Get public vendor details' })
-  getVendorPublicDetails(@Param('vendorProfileId') vendorProfileId: string) {
-    return this.vendorService.getVendorPublicDetails(vendorProfileId);
+  @ApiOperation({
+    summary:
+      'Get public vendor details with follower count, paginated products and related vendors',
+  })
+  @ApiQuery({ name: 'page', required: false, type: Number, example: 1 })
+  @ApiQuery({ name: 'limit', required: false, type: Number, example: 10 })
+  getVendorPublicDetails(
+    @Param('vendorProfileId') vendorProfileId: string,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.vendorService.getVendorPublicDetails(vendorProfileId, {
+      page: page ? Number(page) : 1,
+      limit: limit ? Number(limit) : 10,
+    });
   }
 
   @Post('become-vendor')
@@ -60,7 +74,13 @@ export class VendorController {
         logo: { type: 'string', format: 'binary' },
         banner: { type: 'string', format: 'binary' },
       },
-      required: ['storeName', 'storeDescription', 'storeCategory', 'logo', 'banner'],
+      required: [
+        'storeName',
+        'storeDescription',
+        'storeCategory',
+        'logo',
+        'banner',
+      ],
     },
   })
   @UseInterceptors(
@@ -143,12 +163,21 @@ export class VendorController {
       properties: {
         governmentIdType: {
           type: 'string',
-          enum: ['nin', 'voters_card', 'drivers_license', 'international_passport'],
+          enum: [
+            'nin',
+            'voters_card',
+            'drivers_license',
+            'international_passport',
+          ],
         },
         governmentIdDocument: { type: 'string', format: 'binary' },
         proofOfAddressDocument: { type: 'string', format: 'binary' },
       },
-      required: ['governmentIdType', 'governmentIdDocument', 'proofOfAddressDocument'],
+      required: [
+        'governmentIdType',
+        'governmentIdDocument',
+        'proofOfAddressDocument',
+      ],
     },
   })
   @UseInterceptors(

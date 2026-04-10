@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model, Types } from 'mongoose';
+import {PipelineStage, Model, Types } from 'mongoose';
 import {
   VendorProfile,
   VendorProfileDocument,
@@ -18,22 +18,32 @@ import { UpdateVendorProfileDto } from './dto/update-vendor-profile.dto';
 import { SubmitVendorKycDto } from './dto/submit-vendor-kyc.dto';
 import { VendorStatus } from './enums/vendor-status.enum';
 import { MailService } from '../mail/mail.service';
+import { Product, ProductDocument } from '../product/schemas/product.schema';
+import { ProductStatus } from '../product/enums/product-status.enum';
+import {
+  VendorFollow,
+  VendorFollowDocument,
+} from '../vendor-follow/schemas/vendor-follow.schema';
 import { VendorFollowService } from 'src/vendor-follow/vendor-follow.service';
 
 @Injectable()
 export class VendorService {
-  constructor(
-    @InjectModel(VendorProfile.name)
-    private readonly vendorProfileModel: Model<VendorProfileDocument>,
-    @InjectModel(VendorKyc.name)
-    private readonly vendorKycModel: Model<VendorKycDocument>,
-    private readonly usersService: UsersService,
-    private readonly uploadsService: UploadsService,
-    private readonly cloudinaryService: CloudinaryService,
-    private readonly mailService: MailService,
-    private readonly vendorFollowService: VendorFollowService,
-  ) {}
-
+   
+constructor(
+  @InjectModel(VendorProfile.name)
+  private readonly vendorProfileModel: Model<VendorProfileDocument>,
+  @InjectModel(VendorKyc.name)
+  private readonly vendorKycModel: Model<VendorKycDocument>,
+  @InjectModel(Product.name)
+  private readonly productModel: Model<ProductDocument>,
+  @InjectModel(VendorFollow.name)
+  private readonly vendorFollowModel: Model<VendorFollowDocument>,
+  private readonly usersService: UsersService,
+  private readonly uploadsService: UploadsService,
+  private readonly cloudinaryService: CloudinaryService,
+  private readonly mailService: MailService,
+  private readonly vendorFollowService: VendorFollowService,
+) {}
   async becomeVendor(userId: string) {
     const user = await this.usersService.addVendorRole(userId);
 
@@ -503,54 +513,224 @@ export class VendorService {
   }
 
 
-  async getVendorPublicDetails(vendorProfileId: string, currentUserId?: string) {
-  const vendorProfile = await this.vendorProfileModel
-    .findOne({
-      _id: vendorProfileId,
-      onboardingStatus: VendorStatus.APPROVED,
-    })
-    .populate('userId', 'fullName email country');
 
-  if (!vendorProfile) {
+
+async getVendorPublicDetails(
+  vendorProfileId: string,
+  query?: { page?: number; limit?: number },
+) {
+  const page = Math.max(1, Number(query?.page) || 1);
+  const limit = Math.max(1, Math.min(100, Number(query?.limit) || 10));
+  const skip = (page - 1) * limit;
+
+  const vendorProfileObjectId = new Types.ObjectId(vendorProfileId);
+
+  const vendorDetailsPipeline: PipelineStage[] = [
+    {
+      $match: {
+        _id: vendorProfileObjectId,
+        onboardingStatus: VendorStatus.APPROVED,
+      },
+    },
+    {
+      $lookup: {
+        from: 'users',
+        localField: 'userId',
+        foreignField: '_id',
+        as: 'vendorUser',
+      },
+    },
+    {
+      $unwind: '$vendorUser',
+    },
+    {
+      $lookup: {
+        from: 'vendorfollows',
+        localField: '_id',
+        foreignField: 'vendorProfileId',
+        as: 'followers',
+      },
+    },
+    {
+      $project: {
+        _id: 1,
+        storeName: 1,
+        storeDescription: 1,
+        storeCategory: 1,
+        storeLogoUrl: 1,
+        storeBannerUrl: 1,
+        onboardingStatus: 1,
+        vendorUser: {
+          _id: '$vendorUser._id',
+          fullName: '$vendorUser.fullName',
+          email: '$vendorUser.email',
+          country: '$vendorUser.country',
+        },
+        followersCount: { $size: '$followers' },
+      },
+    },
+  ];
+
+  const vendorDetailsResult = await this.vendorProfileModel.aggregate(
+    vendorDetailsPipeline,
+  );
+
+  if (!vendorDetailsResult.length) {
     throw new NotFoundException('Vendor not found');
   }
 
-  const vendorUser: any = vendorProfile.userId;
+  const vendorDetails = vendorDetailsResult[0];
 
-  const followersCount =
-    await this.vendorFollowService.getFollowersCountByVendorProfileId(
-      vendorProfileId,
-    );
+  const productsPipeline: PipelineStage[] = [
+    {
+      $match: {
+        vendorProfileId: vendorProfileObjectId,
+        status: ProductStatus.APPROVED,
+        isDeleted: false,
+      },
+    },
+    {
+      $sort: { createdAt: -1 as const },
+    },
+    {
+      $facet: {
+        metadata: [{ $count: 'total' }],
+        data: [
+          { $skip: skip },
+          { $limit: limit },
+          {
+            $project: {
+              _id: 1,
+              vendorId: 1,
+              vendorProfileId: 1,
+              name: 1,
+              description: 1,
+              category: 1,
+              tags: 1,
+              images: 1,
+              price: 1,
+              discountPrice: 1,
+              quantity: 1,
+              sku: 1,
+              hasVariants: 1,
+              variants: 1,
+              status: 1,
+              createdAt: 1,
+            },
+          },
+        ],
+      },
+    },
+  ];
 
-  let isFollowing = false;
+  const productsAggregation = await this.productModel.aggregate(productsPipeline);
 
-  if (currentUserId) {
-    isFollowing = await this.vendorFollowService.isFollowingVendor(
-      currentUserId,
-      vendorUser._id.toString(),
-    );
-  }
+  const productsMeta = productsAggregation[0]?.metadata?.[0];
+  const totalProducts = productsMeta?.total || 0;
+  const products = productsAggregation[0]?.data || [];
+
+  const relatedVendorsPipeline: PipelineStage[] = [
+    {
+      $match: {
+        _id: { $ne: vendorProfileObjectId },
+        onboardingStatus: VendorStatus.APPROVED,
+        storeCategory: vendorDetails.storeCategory,
+      },
+    },
+    {
+      $lookup: {
+        from: 'vendorfollows',
+        localField: '_id',
+        foreignField: 'vendorProfileId',
+        as: 'followers',
+      },
+    },
+    {
+      $lookup: {
+        from: 'products',
+        let: { relatedVendorProfileId: '$_id' },
+        pipeline: [
+          {
+            $match: {
+              $expr: {
+                $and: [
+                  { $eq: ['$vendorProfileId', '$$relatedVendorProfileId'] },
+                  { $eq: ['$status', ProductStatus.APPROVED] },
+                  { $eq: ['$isDeleted', false] },
+                ],
+              },
+            },
+          },
+          {
+            $count: 'count',
+          },
+        ],
+        as: 'approvedProductsMeta',
+      },
+    },
+    {
+      $project: {
+        _id: 1,
+        storeName: 1,
+        storeDescription: 1,
+        storeCategory: 1,
+        storeLogoUrl: 1,
+        storeBannerUrl: 1,
+        createdAt: 1,
+        followersCount: { $size: '$followers' },
+        approvedProductsCount: {
+          $ifNull: [{ $arrayElemAt: ['$approvedProductsMeta.count', 0] }, 0],
+        },
+      },
+    },
+    {
+      $sort: {
+        followersCount: -1 as const,
+        approvedProductsCount: -1 as const,
+        createdAt: -1 as const,
+      },
+    },
+    {
+      $limit: 6,
+    },
+    {
+      $project: {
+        createdAt: 0,
+      },
+    },
+  ];
+
+  const relatedVendors = await this.vendorProfileModel.aggregate(
+    relatedVendorsPipeline,
+  );
 
   return {
     message: 'Vendor details fetched successfully',
     data: {
       vendor: {
-        id: vendorUser._id,
-        fullName: vendorUser.fullName,
-        email: vendorUser.email,
-        country: vendorUser.country,
+        id: vendorDetails.vendorUser._id,
+        fullName: vendorDetails.vendorUser.fullName,
+        email: vendorDetails.vendorUser.email,
+        country: vendorDetails.vendorUser.country,
       },
       store: {
-        id: vendorProfile._id,
-        storeName: vendorProfile.storeName,
-        storeDescription: vendorProfile.storeDescription,
-        storeCategory: vendorProfile.storeCategory,
-        storeLogoUrl: vendorProfile.storeLogoUrl,
-        storeBannerUrl: vendorProfile.storeBannerUrl,
-        onboardingStatus: vendorProfile.onboardingStatus,
+        id: vendorDetails._id,
+        storeName: vendorDetails.storeName,
+        storeDescription: vendorDetails.storeDescription,
+        storeCategory: vendorDetails.storeCategory,
+        storeLogoUrl: vendorDetails.storeLogoUrl,
+        storeBannerUrl: vendorDetails.storeBannerUrl,
+        onboardingStatus: vendorDetails.onboardingStatus,
       },
-      followersCount,
-      isFollowing,
+      followersCount: vendorDetails.followersCount,
+      products,
+      relatedVendors,
+    },
+    meta: {
+      page,
+      limit,
+      totalProducts,
+      totalProductPages: Math.ceil(totalProducts / limit),
     },
   };
 }

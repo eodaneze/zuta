@@ -25,19 +25,34 @@ import { ProductService } from './product.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { ProductQueryDto } from './dto/product-query.dto';
-import { RolesGuard } from 'src/common/guards/roles.guard';
-import { Roles } from 'src/common/decorators/roles.decorator';
-import { UserRole } from 'src/users/schemas/user.schema';
+import { PublicProductQueryDto } from './dto/public-product-query.dto';
 
 @ApiTags('Products')
-@ApiBearerAuth()
-@UseGuards(JwtAuthGuard, RolesGuard)
-@Roles(UserRole.VENDOR)
 @Controller('products')
 export class ProductController {
   constructor(private readonly productService: ProductService) {}
 
+  @Get('public')
+  @ApiOperation({ summary: 'Get public approved products with pagination, filter and search' })
+  getPublicProducts(@Query() query: PublicProductQueryDto) {
+    return this.productService.getPublicProducts(query);
+  }
+
+  @Get('public/:productId')
+  @ApiOperation({
+    summary:
+      'Get public single product details, vendor details and vendor other products with pagination, filter and search',
+  })
+  getPublicSingleProduct(
+    @Param('productId') productId: string,
+    @Query() query: PublicProductQueryDto,
+  ) {
+    return this.productService.getPublicSingleProduct(productId, query);
+  }
+
   @Post()
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
   @ApiConsumes('multipart/form-data')
   @ApiOperation({ summary: 'Create product' })
   @ApiBody({
@@ -97,6 +112,8 @@ export class ProductController {
   }
 
   @Get('me')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Get my products' })
   getMyProducts(
     @CurrentUser() user: any,
@@ -106,6 +123,8 @@ export class ProductController {
   }
 
   @Get('me/:productId')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Get my single product' })
   getMySingleProduct(
     @CurrentUser() user: any,
@@ -118,6 +137,8 @@ export class ProductController {
   }
 
   @Patch('me/:productId')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
   @ApiConsumes('multipart/form-data')
   @ApiOperation({ summary: 'Update my product' })
   @ApiBody({
@@ -188,6 +209,8 @@ export class ProductController {
   }
 
   @Delete('me/:productId')
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Delete my product' })
   deleteMyProduct(
     @CurrentUser() user: any,

@@ -23,6 +23,7 @@ import { MailService } from '../mail/mail.service';
 import { NotificationService } from '../notification/notification.service';
 import { NotificationType } from '../notification/enums/notification-type.enum';
 import { connect } from 'http2';
+import { User, UserDocument } from 'src/users/schemas/user.schema';
 
 @Injectable()
 export class ProductService {
@@ -33,6 +34,9 @@ export class ProductService {
     private readonly vendorProfileModel: Model<VendorProfileDocument>,
     @InjectModel(VendorKyc.name)
     private readonly vendorKycModel: Model<VendorKycDocument>,
+    @InjectModel(User.name)
+    private readonly userModel: Model<UserDocument>,
+
     private readonly uploadsService: UploadsService,
     private readonly cloudinaryService: CloudinaryService,
     private readonly mailService: MailService,
@@ -443,4 +447,234 @@ export class ProductService {
       data: product,
     };
   }
+
+   async getPublicProducts(query: {
+    search?: string;
+    category?: string;
+    page?: number;
+    limit?: number;
+  }) {
+  const page = query.page ?? 1;
+  const limit = query.limit ?? 12;
+  const skip = (page - 1) * limit;
+
+  const approvedVendorProfiles = await this.vendorProfileModel
+    .find({ onboardingStatus: VendorStatus.APPROVED })
+    .select('_id');
+
+  const approvedVendorProfileIds = approvedVendorProfiles.map(
+    (item) => item._id,
+  );
+
+  const filter: Record<string, any> = {
+    isDeleted: false,
+    status: ProductStatus.APPROVED,
+    vendorProfileId: { $in: approvedVendorProfileIds },
+  };
+
+  if (query.category) {
+    filter.category = query.category;
+  }
+
+  if (query.search) {
+    filter.$or = [
+      { name: { $regex: query.search, $options: 'i' } },
+      { description: { $regex: query.search, $options: 'i' } },
+      { sku: { $regex: query.search, $options: 'i' } },
+      { category: { $regex: query.search, $options: 'i' } },
+      { tags: { $elemMatch: { $regex: query.search, $options: 'i' } } },
+    ];
+  }
+
+  const [products, total] = await Promise.all([
+    this.productModel
+      .find(filter)
+      .populate('vendorId', 'fullName country')
+      .populate(
+        'vendorProfileId',
+        'storeName storeDescription storeCategory storeLogoUrl storeBannerUrl',
+      )
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit),
+    this.productModel.countDocuments(filter),
+  ]);
+
+  return {
+    message: 'Public products fetched successfully',
+    data: products,
+    meta: {
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total / limit),
+    },
+  };
+}
+
+async getPublicSingleProduct(
+  productId: string,
+  query: {
+    search?: string;
+    category?: string;
+    page?: number;
+    limit?: number;
+  },
+) {
+  const page = query.page ?? 1;
+  const limit = query.limit ?? 10;
+  const skip = (page - 1) * limit;
+
+  const product = await this.productModel.aggregate([
+    {
+      $match: {
+        _id: new Types.ObjectId(productId),
+        status: ProductStatus.APPROVED,
+        isDeleted: false,
+      },
+    },
+    {
+      $lookup: {
+        from: 'vendorprofiles',
+        localField: 'vendorProfileId',
+        foreignField: '_id',
+        as: 'vendorProfile',
+      },
+    },
+    {
+      $unwind: '$vendorProfile',
+    },
+    {
+      $match: {
+        'vendorProfile.onboardingStatus': VendorStatus.APPROVED,
+      },
+    },
+    {
+      $lookup: {
+        from: 'users',
+        localField: 'vendorId',
+        foreignField: '_id',
+        as: 'vendorUser',
+      },
+    },
+    {
+      $unwind: '$vendorUser',
+    },
+    {
+      $project: {
+        _id: 1,
+        vendorId: 1,
+        vendorProfileId: 1,
+        name: 1,
+        description: 1,
+        category: 1,
+        tags: 1,
+        images: 1,
+        price: 1,
+        discountPrice: 1,
+        quantity: 1,
+        sku: 1,
+        hasVariants: 1,
+        variants: 1,
+        status: 1,
+        createdAt: 1,
+        vendorUser: {
+          _id: '$vendorUser._id',
+          fullName: '$vendorUser.fullName',
+          email: '$vendorUser.email',
+          country: '$vendorUser.country',
+        },
+        vendorProfile: {
+          _id: '$vendorProfile._id',
+          storeName: '$vendorProfile.storeName',
+          storeDescription: '$vendorProfile.storeDescription',
+          storeCategory: '$vendorProfile.storeCategory',
+          storeLogoUrl: '$vendorProfile.storeLogoUrl',
+          storeBannerUrl: '$vendorProfile.storeBannerUrl',
+          onboardingStatus: '$vendorProfile.onboardingStatus',
+        },
+      },
+    },
+  ]);
+
+  if (!product.length) {
+    throw new NotFoundException('Product not found');
+  }
+
+  const currentProduct = product[0];
+
+  const otherProductsFilter: Record<string, any> = {
+    _id: { $ne: new Types.ObjectId(productId) },
+    vendorProfileId: new Types.ObjectId(currentProduct.vendorProfile._id),
+    status: ProductStatus.APPROVED,
+    isDeleted: false,
+  };
+
+  if (query.category) {
+    otherProductsFilter.category = query.category;
+  }
+
+  if (query.search) {
+    otherProductsFilter.$or = [
+      { name: { $regex: query.search, $options: 'i' } },
+      { description: { $regex: query.search, $options: 'i' } },
+      { sku: { $regex: query.search, $options: 'i' } },
+      { category: { $regex: query.search, $options: 'i' } },
+      { tags: { $elemMatch: { $regex: query.search, $options: 'i' } } },
+    ];
+  }
+
+  const [vendorProducts, totalVendorProducts] = await Promise.all([
+    this.productModel
+      .find(otherProductsFilter)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit),
+    this.productModel.countDocuments(otherProductsFilter),
+  ]);
+
+  return {
+    message: 'Public product fetched successfully',
+    data: {
+      product: {
+        id: currentProduct._id,
+        name: currentProduct.name,
+        description: currentProduct.description,
+        category: currentProduct.category,
+        tags: currentProduct.tags,
+        images: currentProduct.images,
+        price: currentProduct.price,
+        discountPrice: currentProduct.discountPrice,
+        quantity: currentProduct.quantity,
+        sku: currentProduct.sku,
+        hasVariants: currentProduct.hasVariants,
+        variants: currentProduct.variants,
+        status: currentProduct.status,
+        createdAt: currentProduct.createdAt,
+      },
+      vendor: {
+        id: currentProduct.vendorUser._id,
+        fullName: currentProduct.vendorUser.fullName,
+        email: currentProduct.vendorUser.email,
+        country: currentProduct.vendorUser.country,
+      },
+      store: {
+        id: currentProduct.vendorProfile._id,
+        storeName: currentProduct.vendorProfile.storeName,
+        storeDescription: currentProduct.vendorProfile.storeDescription,
+        storeCategory: currentProduct.vendorProfile.storeCategory,
+        storeLogoUrl: currentProduct.vendorProfile.storeLogoUrl,
+        storeBannerUrl: currentProduct.vendorProfile.storeBannerUrl,
+        onboardingStatus: currentProduct.vendorProfile.onboardingStatus,
+      },
+      vendorProducts,
+    },
+    meta: {
+      page,
+      limit,
+      totalVendorProducts,
+      totalVendorProductPages: Math.ceil(totalVendorProducts / limit),
+    },
+  };
+}
 }
