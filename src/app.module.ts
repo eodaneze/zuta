@@ -13,6 +13,7 @@ import { AdminModule } from './admin/admin.module';
 import { ProductModule } from './product/product.module';
 import { NotificationModule } from './notification/notification.module';
 import { VendorFollowModule } from './vendor-follow/vendor-follow.module';
+import { SettingsModule } from './settings/settings.module';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { VendorFollowModule } from './vendor-follow/vendor-follow.module';
     ProductModule,
     NotificationModule,
     VendorFollowModule,
+    SettingsModule,
   ],
 })
 export class AppModule {}
